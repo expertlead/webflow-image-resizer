@@ -5,8 +5,10 @@ const probe = require('probe-image-size');
 const s3 = new AWS.S3();
 require('dotenv').config();
 
-const limit = 10; //controls amount of items per collection to process
+const limit = 100; //controls amount of items per collection to process (max: 100)
 const sizingRegEx = /(\d{1,4})x(\d{1,4})/gm;
+let failedCounter = 0;
+let processedItems = 0;
 
 function Resizer(config) {
     this.config = config;
@@ -14,46 +16,46 @@ function Resizer(config) {
 }
 
 Resizer.prototype.onResizeSite = function (siteId) {
-    console.log(this.config)
     const collections = this.webflow.collections({ siteId: siteId })
 
-    collections.then(collections => {
-        collections.forEach(collection => this.checkCollection(collection))
+    return collections.then(collections => {
+        return collections.forEach(collection => {return this.checkCollection(collection)})
     })
+        .finally(res => { console.log(res, failedCounter) })
 }
 
-Resizer.prototype.checkCollection = function(collection) {
+Resizer.prototype.checkCollection = function (collection) {
     const collectionToCheck = this.webflow.collection({ collectionId: collection._id })
 
-    collectionToCheck
+    return collectionToCheck
         .then(
             c => {
-            c.fields.forEach(field => {
-                if (field.type === "ImageRef") {
-                    if (field.helpText.match(sizingRegEx) !== null) {
-                        this.getAllItems(collection, field)
-                    } else {
-                        console.log(`Help text for "${field.name}" has no sizing information. Collection: ${collection.name}`);
+                c.fields.forEach(field => {
+                    if (field.type === "ImageRef") {
+                        if (field.helpText.match(sizingRegEx) !== null) {
+                            return this.getAllItems(collection, field)
+                        } else {
+                            console.log(`Help text for "${field.name}" has no sizing information. Collection: ${collection.name}`);
+                        }
                     }
                 }
+                )
             }
-            )
-        }
-    );
+        );
 };
 
-Resizer.prototype.getAllItems = function(collection, field) {
+Resizer.prototype.getAllItems = function (collection, field) {
     let collectionId = collection._id;
     const allItems = this.webflow.items({ collectionId: collectionId }, { limit: limit });
 
-    allItems.then(allItems => {
-        this.processItems(allItems.items, collectionId, field);
+    return allItems.then(allItems => {
         console.log(`### Processing ${allItems.items.length} Items from ${collectionId}`);
+        return this.processItems(allItems.items, collectionId, field);
     })
 }
 
 //Processes all items in collection
-Resizer.prototype.processItems = function(items, collectionId, field) {
+Resizer.prototype.processItems = function (items, collectionId, field) {
     items.forEach((item) => {
         let size = field.helpText.match(sizingRegEx);
         let imgSize = size[0].split('x');
@@ -66,27 +68,27 @@ Resizer.prototype.processItems = function(items, collectionId, field) {
             'imageUrl': item[`${field.slug}`].url,
             'fieldName': field.slug,
             'fieldId': field.id,
-            'width': imgSize[0] == 0 ? Jimp.AUTO : Number(imgSize[0]),
-            'height': imgSize[1] == 0 ? Jimp.AUTO : Number(imgSize[1])
+            'width': Number(imgSize[0]),
+            'height': Number(imgSize[1])
         }
 
-        if(itemDetails.height !== itemDetails.width) {
-        probe(item[`${field.slug}`].url)
-            .then(result => {
-                if (result.width > itemDetails.width || result.height > itemDetails.height) {
-                    this.changeSize(itemDetails)
-                } else {
-                    console.log(`Skipping "${item._id}". Item already resized`)
-                }
-            });
+        if (itemDetails.height !== 0 && itemDetails.width !== 0) {
+            return probe(item[`${field.slug}`].url)
+                .then(result => {
+                    if (result.width > itemDetails.width || result.height > itemDetails.height) {
+                        return this.changeSize(itemDetails)
+                    } else {
+                        console.log(`Skipping "${item._id}". Item already resized`)
+                    }
+                });
         } else {
-            console.log('Height and Width cannot both be set to 0 in help text')
+            console.log('Height and Width cannot set to 0 in help text')
         }
     });
 }
 
-Resizer.prototype.changeSize = function(itemDetails) {
-    Jimp.read(itemDetails.imageUrl)
+Resizer.prototype.changeSize = function (itemDetails) {
+    return Jimp.read(itemDetails.imageUrl)
         .then(image => {
             return image
                 .scaleToFit(itemDetails.width, itemDetails.height) // resize
@@ -94,27 +96,34 @@ Resizer.prototype.changeSize = function(itemDetails) {
                 .getBufferAsync(Jimp.MIME_JPEG)
         })
         .then(img => {
-            this.uploadToAws(img, itemDetails);
+            return this.uploadToAws(img, itemDetails);
         })
         .catch(err => {
             console.error(err);
+            failedCounter++;
         });
 };
 
-Resizer.prototype.uploadToAws = function(img, itemDetails) {
+Resizer.prototype.uploadToAws = function (img, itemDetails) {
     let myBucket = this.config.aws.bucket;
     let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
     let params = { Bucket: myBucket, Key: myKey, Body: img };
 
-    s3.putObject(params, function (err, data) {
+    return s3.putObject(params, function (err, data) {
         if (err) {
+            // todo: throw error exception
             console.log('error during upload to s3', err)
+            failedCounter++;
         }
-    })
-    this.updateWebflow(itemDetails)
+    }).promise().then(
+        res => {
+            // todo: check response
+            return this.updateWebflow(itemDetails)
+        }
+    )
 }
 
-Resizer.prototype.updateWebflow = function(itemDetails) {
+Resizer.prototype.updateWebflow = function (itemDetails) {
     let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
     let field = `${itemDetails.fieldName}`;
     let fieldsObject = {
@@ -133,9 +142,10 @@ Resizer.prototype.updateWebflow = function(itemDetails) {
     const item = this.webflow.updateItem(fieldsObject)
         .catch(err => {
             console.log(err);
+            failedCounter++;
         });
 
-    item.then(i => console.log(`Updated ${field} of '${itemDetails.itemName}' in Collection: '${itemDetails.collectionId}'`))
+    return item.then(i => console.log(`Updated ${field} of '${itemDetails.itemName}' in Collection: '${itemDetails.collectionId}'`))
 }
 
 exports.default = Resizer;

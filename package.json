@@ -1,6 +1,6 @@
 {
   "name": "webflow-image-resizer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Resize images in the WebFlow CMS based on predefined size in help field",
   "main": "index.js",
   "scripts": {
