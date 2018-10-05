@@ -1,10 +1,10 @@
 {
   "name": "webflow-image-resizer",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Resize images in the WebFlow CMS based on predefined size in help field",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 0"
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -28,5 +28,8 @@
   "bugs": {
     "url": "https://github.com/expertlead/webflow-image-resizer/issues"
   },
-  "homepage": "https://github.com/expertlead/webflow-image-resizer#readme"
+  "homepage": "https://github.com/expertlead/webflow-image-resizer#readme",
+  "devDependencies": {
+    "jest": "^23.6.0"
+  }
 }
