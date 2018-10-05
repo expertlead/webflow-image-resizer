@@ -4,7 +4,7 @@
 
 ## about
 
-Resize images in the WebFlow CMS based on predefined size in help field
+Resize images in the WebFlow CMS based on predefined size in help field. Format for help field sizing "300x300" supports 1 - 4 digit numbers. Images will be scaled down to fit constraints.
 
 ## how to install
 
