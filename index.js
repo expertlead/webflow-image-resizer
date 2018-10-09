@@ -4,7 +4,7 @@ const AWS = require('aws-sdk');
 const probe = require('probe-image-size');
 require('dotenv').config();
 
-const limit = 100; //controls amount of items per collection to process (max: 100)
+const limit = 2; //controls amount of items per collection to process (max: 100)
 const sizingRegEx = /(\d{1,4})x(\d{1,4})/gm;
 
 function Resizer(config) {
@@ -50,15 +50,13 @@ Resizer.prototype.onResizeSite = function (siteId) {
         collectionsFieldsWithImages => {
             var fetchItemsPromises = []
             collectionsFieldsWithImages.forEach(collectionFields => {
-                fetchItemsPromises.push(
-                    this.webflow.items({ collectionId: collectionFields.collectionId }, { limit: limit })
-                        .then(
-                            collectionItems => {
-                                collectionItems.fields = collectionFields.fields
-                                return this.processItems(collectionItems)
-                            }
-                        )
-                )
+                this.getAllItems(collectionFields)
+                    .then(
+                        collectionItems => {
+                            collectionItems.fields = collectionFields.fields
+                            return this.processItems(collectionItems)
+                        }
+                    )
             })
 
             return fetchItemsPromises
@@ -117,6 +115,26 @@ Resizer.prototype.onResizeSite = function (siteId) {
             }
         }
     )
+}
+
+Resizer.prototype.getAllItems = function (collection) {
+    let itemsArr = [];
+
+    this.webflow.items({ collectionId: collection.collectionId }, { limit: limit })
+        .then(items => {
+            let runs = Math.floor(items.total / limit);
+            let offset = items.offset;
+            for (i = 1; i <= runs; i++) {
+                itemsArr.push(this.webflow.items(
+                    { collectionId: collection.collectionId },
+                    { limit: limit },
+                    { offset: offset * [i] }
+                )
+                )
+            }
+            console.log(itemsArr)
+            return itemsArr;
+        })
 }
 
 Resizer.prototype.getImagesFieldsFromCollection = function (collection) {
