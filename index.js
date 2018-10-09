@@ -4,7 +4,7 @@ const AWS = require('aws-sdk');
 const probe = require('probe-image-size');
 require('dotenv').config();
 
-const limit = 2; //controls amount of items per collection to process (max: 100)
+const limit = 100; //controls amount of items per collection to process (max: 100)
 const sizingRegEx = /(\d{1,4})x(\d{1,4})/gm;
 
 function Resizer(config) {
@@ -48,24 +48,28 @@ Resizer.prototype.onResizeSite = function (siteId) {
         }
     ).then(
         collectionsFieldsWithImages => {
-            var fetchItemsPromises = []
+            var processedItemsPromises = [];
             collectionsFieldsWithImages.forEach(collectionFields => {
-                this.getAllItems(collectionFields)
-                    .then(
-                        collectionItems => {
-                            collectionItems.fields = collectionFields.fields
-                            return this.processItems(collectionItems)
-                        }
-                    )
+                processedItemsPromises.push(
+                    this.getAllItems(collectionFields)
+                        .then(
+                            collectionItems => {
+                                collectionItems = collectionItems.map(page => {
+                                    page.fields = collectionFields.fields
+                                    return this.processItems(page);
+                                })
+                                return collectionItems
+                            }
+                        )
+                )
             })
-
-            return fetchItemsPromises
+            return processedItemsPromises
         }
     ).then(
-        processedItems => {
-            return Promise.all(processedItems).then(
-                itemsImages => {
-                    return itemsImages;
+        processedItemsPromises => {
+            return Promise.all(processedItemsPromises).then(
+                processedItems => {
+                    return processedItems[0]
                 }
             )
         }
@@ -118,22 +122,19 @@ Resizer.prototype.onResizeSite = function (siteId) {
 }
 
 Resizer.prototype.getAllItems = function (collection) {
-    let itemsArr = [];
 
-    this.webflow.items({ collectionId: collection.collectionId }, { limit: limit })
+    return this.webflow.items({ collectionId: collection.collectionId }, { limit: limit })
         .then(items => {
-            let runs = Math.floor(items.total / limit);
-            let offset = items.offset;
-            for (i = 1; i <= runs; i++) {
+            let itemsArr = [];
+            let runs = Math.ceil(items.total / limit);
+            for (i = 0; i < runs; i++) {
                 itemsArr.push(this.webflow.items(
                     { collectionId: collection.collectionId },
-                    { limit: limit },
-                    { offset: offset * [i] }
+                    { limit: limit, offset: limit * i },
                 )
                 )
             }
-            console.log(itemsArr)
-            return itemsArr;
+            return Promise.all(itemsArr);
         })
 }
 
