@@ -122,19 +122,22 @@ Resizer.prototype.onResizeSite = function (siteId) {
 }
 
 Resizer.prototype.getAllItems = function (collection) {
+    let itemsPromises = [];
 
     return this.webflow.items({ collectionId: collection.collectionId }, { limit: limit })
-        .then(items => {
-            let itemsArr = [];
-            let runs = Math.ceil(items.total / limit);
-            for (i = 0; i < runs; i++) {
-                itemsArr.push(this.webflow.items(
-                    { collectionId: collection.collectionId },
-                    { limit: limit, offset: limit * i },
-                )
-                )
+        .then(res => {
+            itemsPromises.push(res);
+            if (res.total > res.limit) {
+                let runs = Math.ceil(res.total / limit);
+                for (i = 1; i < runs; i++) {
+                    itemsPromises.push(this.webflow.items(
+                        { collectionId: collection.collectionId },
+                        { limit: limit, offset: limit * i },
+                    )
+                    )
+                }
             }
-            return Promise.all(itemsArr);
+            return Promise.all(itemsPromises);
         })
 }
 

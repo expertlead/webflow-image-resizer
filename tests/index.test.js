@@ -84,5 +84,3 @@ test('validateImageSize rejects item (returns null)', () => {
         expect(data).toBe(null);
     });
 });
-
-
