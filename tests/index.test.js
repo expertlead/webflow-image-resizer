@@ -9,7 +9,8 @@ const resizer = new Resizer({
     },
     webflow: {
         token: '7b690b88e3e151ff6b2dec81d9df55da9f0312895afc398a1078776555d25397'
-    }
+    },
+    quality: 90
 });
 
 resizer.s3 = {
@@ -62,7 +63,14 @@ test('processItems returns process items in an array', () => {
             'fieldName': "main-image",
             'fieldId': "b6ed353667320c2875a1d2feb2bdf004",
             'width': 500,
-            'height': 300
+            'height': 300,
+            'requiredFields': [{
+                "fieldName": "main-image",
+                "fieldValue": {
+                    "fileId": "5bb63dad95d21b2d604e6318",
+                    "url": "https://uploads-ssl.webflow.com/5ba8b76cfb278db77e75c002/5bb63dad95d21b2d604e6318_5bb63d9ed7637b63430e15aa-b6ed353667320c2875a1d2feb2bdf004.jpeg"
+                }
+            }]
         }]
     )
 })

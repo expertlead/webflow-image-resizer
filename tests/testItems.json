@@ -39,5 +39,14 @@
             "id": "b6ed353667320c2875a1d2feb2bdf004",
             "validations": {}
         }
+    ],
+    "requiredFields": [
+        {
+            "slug": "main-image",
+            "main-image": {
+                "fileId": "5bb63dad95d21b2d604e6318",
+                "url": "https://uploads-ssl.webflow.com/5ba8b76cfb278db77e75c002/5bb63dad95d21b2d604e6318_5bb63d9ed7637b63430e15aa-b6ed353667320c2875a1d2feb2bdf004.jpeg"
+            }
+        }
     ]
 }
