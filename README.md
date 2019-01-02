@@ -8,7 +8,9 @@ Resize images in the WebFlow CMS based on predefined size in your collection ima
 
 Images will be scaled down to fit the smallest constraint, with priority given to width. For example stating with an image 1300x860 and help text of 400x400, the result would be an image of 400x265.
 
-Image fields without help text or images that already meet the sizing requirements will be ignored by image-resizer. 
+Image fields without help text or images that already meet the sizing requirements will be ignored by image-resizer.
+
+Supported types: jpeg, png, bmp, tiff, gif
 
 ![size-example](https://i.imgur.com/eDF1JEy.png)
 
@@ -37,7 +39,8 @@ var resizer = new WebflowImageResizer(
         },
         webflow: {
             token: 'example-webflow-token'
-        }
+        },
+        quality: 90  //quality of image asa percentage
     }
 );
 

@@ -10,11 +10,12 @@ const sizingRegEx = /(\d{1,4})x(\d{1,4})/gm;
 function Resizer(config) {
     this.config = config;
     this.s3 = new AWS.S3({ region: config.aws.region });
-    this.webflow = new Webflow({ token: this.config.webflow.token });
+    this.webflow = new Webflow({ token: config.webflow.token });
 }
 
 Resizer.prototype.onResizeSite = function (siteId) {
     const collections = this.webflow.collections({ siteId: siteId })
+    console.log(`siteId is ${siteId}`)
 
     return collections.then(collections => {
         var fetchPromises = []
@@ -22,6 +23,7 @@ Resizer.prototype.onResizeSite = function (siteId) {
             fetchPromises.push(
                 this.webflow.collection({ collectionId: collection._id })
             )
+            console.log(`Getting items from collection ${collection._id}`)
         })
 
         return fetchPromises
@@ -35,15 +37,17 @@ Resizer.prototype.onResizeSite = function (siteId) {
         collections => {
             collectionsWithImagesFields = []
             collections.forEach(c => {
+                console.log(`checking for image fields in ${c._id}`)
                 var imagesFields = this.getImagesFieldsFromCollection(c);
                 if (0 !== imagesFields.length) {
+                    var requiredFields = this.getRequiredFieldsFromCollection(c);
                     collectionsWithImagesFields.push({
                         collectionId: c._id,
-                        fields: imagesFields
+                        fields: imagesFields,
+                        requiredFields: requiredFields
                     })
                 }
             })
-
             return collectionsWithImagesFields;
         }
     ).then(
@@ -54,8 +58,10 @@ Resizer.prototype.onResizeSite = function (siteId) {
                     this.getAllItems(collectionFields)
                         .then(
                             collectionItems => {
+                                console.log(`processing ${collectionItems.length} items`)
                                 collectionItems = collectionItems.map(page => {
                                     page.fields = collectionFields.fields
+                                    page.requiredFields = collectionFields.requiredFields
                                     return this.processItems(page);
                                 })
                                 return collectionItems
@@ -111,6 +117,7 @@ Resizer.prototype.onResizeSite = function (siteId) {
                 var sizeChangePromises = [];
                 filteredItems.forEach(
                     filteredItem => {
+                        console.log(`resizing ${filteredItem}`)
                         sizeChangePromises.push(this.changeSize(filteredItem))
                     }
                 )
@@ -153,26 +160,45 @@ Resizer.prototype.getImagesFieldsFromCollection = function (collection) {
     return imagesFields;
 }
 
+Resizer.prototype.getRequiredFieldsFromCollection = function (collection) {
+    var requiredFields = [];
+    for (var i = 0; i < collection.fields.length; i++) {
+        if (collection.fields[i].required === true) {
+            requiredFields.push(collection.fields[i]);
+        }
+    }
+
+    return requiredFields;
+}
+
 //Processes all items in collection
 Resizer.prototype.processItems = function (collectionItems) {
     var itemsImages = []
     collectionItems.fields.forEach((field) => {
         collectionItems.items.forEach((item) => {
-            let size = field.helpText.match(sizingRegEx);
-            let imgSize = size[0].split('x');
-            let itemDetails = {
-                'collectionId': item._cid,
-                'itemId': item._id,
-                'itemName': item.name,
-                'itemSlug': item.slug,
-                'imageUrl': item[`${field.slug}`].url,
-                'fieldName': field.slug,
-                'fieldId': field.id,
-                'width': Number(imgSize[0]),
-                'height': Number(imgSize[1])
-            }
-            if (itemDetails.height !== 0 && itemDetails.width !== 0) {
-                itemsImages.push(itemDetails)
+            if (item[`${field.slug}`]) {
+                let size = field.helpText.match(sizingRegEx);
+                let imgSize = size[0].split('x');
+
+                let requiredFields = collectionItems.requiredFields.map(field => {
+                    return {fieldName: field.slug, fieldValue: item[field.slug]}
+                })
+
+                let itemDetails = {
+                    'collectionId': item._cid,
+                    'itemId': item._id,
+                    'itemName': item.name,
+                    'itemSlug': item.slug,
+                    'imageUrl': item[`${field.slug}`].url,
+                    'fieldName': field.slug,
+                    'fieldId': field.id,
+                    'width': Number(imgSize[0]),
+                    'height': Number(imgSize[1]),
+                    'requiredFields': requiredFields
+                }
+                if (itemDetails.height !== 0 && itemDetails.width !== 0) {
+                    itemsImages.push(itemDetails)
+                }
             }
         })
     });
@@ -200,14 +226,14 @@ Resizer.prototype.changeSize = function (itemDetails) {
         .then(image => {
             return image
                 .scaleToFit(itemDetails.width, itemDetails.height) // resize
-                .quality(100) // set JPEG quality     
+                .quality(this.config.quality) // set JPEG quality     
                 .getBufferAsync(Jimp.MIME_JPEG)
         })
         .then(img => {
             return this.uploadToAws(img, itemDetails);
         })
         .catch(err => {
-            console.error(
+            console.log(
                 'error scaling the image',
                 err,
                 itemDetails
@@ -222,7 +248,7 @@ Resizer.prototype.uploadToAws = function (img, itemDetails) {
 
     return this.s3.putObject(params, function (err, data) {
         if (err) {
-            console.error(
+            console.log(
                 'error during upload to s3',
                 err,
                 itemDetails
@@ -238,22 +264,22 @@ Resizer.prototype.uploadToAws = function (img, itemDetails) {
 Resizer.prototype.updateWebflow = function (itemDetails) {
     let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
     let field = `${itemDetails.fieldName}`;
+    
     let fieldsObject = {
         collectionId: itemDetails.collectionId,
         itemId: itemDetails.itemId,
-        fields: {
-            'name': itemDetails.itemName,
-            'slug': itemDetails.itemSlug,
-            '_archived': false,
-            '_draft': false,
-        }
+        fields: {}
     }
-
+    
     fieldsObject.fields[field] = url;
+
+    itemDetails.requiredFields.forEach(field => {
+        fieldsObject.fields[field.fieldName] = field.fieldValue;
+    })
 
     const item = this.webflow.updateItem(fieldsObject)
         .catch(err => {
-            console.error(err, itemDetails);
+            console.log(err, itemDetails);
         });
 
     return item.then(i => console.log(`Updated ${field} of '${itemDetails.itemName}' in Collection: '${itemDetails.collectionId}'`))
