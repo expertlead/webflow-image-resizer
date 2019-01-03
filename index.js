@@ -224,16 +224,23 @@ Resizer.prototype.validateImageSize = function (itemDetails) {
 Resizer.prototype.changeSize = function (itemDetails) {
     return Jimp.read(itemDetails.imageUrl)
         .then(image => {
+            const mime =
+                image.getMIME().split("/")[1] === "jpg" || "png" || "bmp"
+                    ?
+                    image.getMIME().split("/")[1]
+                    :
+                    "png";
+            itemDetails.mime = mime;
+
             return image
                 .scaleToFit(itemDetails.width, itemDetails.height) // resize
-                .quality(this.config.quality) // set PNG quality
-                .getBufferAsync(Jimp.MIME_PNG)
+                .getBufferAsync(Jimp.AUTO)
         })
         .then(img => {
             return this.uploadToAws(img, itemDetails);
         })
         .catch(err => {
-            console.log(
+            console.error(
                 'error scaling the image',
                 err,
                 itemDetails
@@ -243,12 +250,13 @@ Resizer.prototype.changeSize = function (itemDetails) {
 
 Resizer.prototype.uploadToAws = function (img, itemDetails) {
     let myBucket = this.config.aws.bucket;
-    let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.png`;
+    let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.${itemDetails.mime}`;
     let params = {Bucket: myBucket, Key: myKey, Body: img};
+    console.log(params)
 
     return this.s3.putObject(params, function (err, data) {
         if (err) {
-            console.log(
+            console.error(
                 'error during upload to s3',
                 err,
                 itemDetails
@@ -262,7 +270,7 @@ Resizer.prototype.uploadToAws = function (img, itemDetails) {
 }
 
 Resizer.prototype.updateWebflow = function (itemDetails) {
-    let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.png`;
+    let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.${itemDetails.mime}`;
     let field = `${itemDetails.fieldName}`;
 
     let fieldsObject = {

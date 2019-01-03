@@ -10,7 +10,7 @@ Images will be scaled down to fit the smallest constraint, with priority given t
 
 Image fields without help text or images that already meet the sizing requirements will be ignored by image-resizer.
 
-Supported types: `jpeg`, `png`, `bmp`, `tiff`, `gif`
+Supported types: `jpeg`, `png`, `bmp`
 
 ![size-example](https://i.imgur.com/eDF1JEy.png)
 
