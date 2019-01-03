@@ -9,19 +9,19 @@ const sizingRegEx = /(\d{1,4})x(\d{1,4})/gm;
 
 function Resizer(config) {
     this.config = config;
-    this.s3 = new AWS.S3({ region: config.aws.region });
-    this.webflow = new Webflow({ token: config.webflow.token });
+    this.s3 = new AWS.S3({region: config.aws.region});
+    this.webflow = new Webflow({token: config.webflow.token});
 }
 
 Resizer.prototype.onResizeSite = function (siteId) {
-    const collections = this.webflow.collections({ siteId: siteId })
+    const collections = this.webflow.collections({siteId: siteId})
     console.log(`siteId is ${siteId}`)
 
     return collections.then(collections => {
         var fetchPromises = []
         collections.forEach(collection => {
             fetchPromises.push(
-                this.webflow.collection({ collectionId: collection._id })
+                this.webflow.collection({collectionId: collection._id})
             )
             console.log(`Getting items from collection ${collection._id}`)
         })
@@ -131,16 +131,16 @@ Resizer.prototype.onResizeSite = function (siteId) {
 Resizer.prototype.getAllItems = function (collection) {
     let itemsPromises = [];
 
-    return this.webflow.items({ collectionId: collection.collectionId }, { limit: limit })
+    return this.webflow.items({collectionId: collection.collectionId}, {limit: limit})
         .then(res => {
             itemsPromises.push(res);
             if (res.total > res.limit) {
                 let runs = Math.ceil(res.total / limit);
                 for (i = 1; i < runs; i++) {
                     itemsPromises.push(this.webflow.items(
-                        { collectionId: collection.collectionId },
-                        { limit: limit, offset: limit * i },
-                    )
+                        {collectionId: collection.collectionId},
+                        {limit: limit, offset: limit * i},
+                        )
                     )
                 }
             }
@@ -244,7 +244,7 @@ Resizer.prototype.changeSize = function (itemDetails) {
 Resizer.prototype.uploadToAws = function (img, itemDetails) {
     let myBucket = this.config.aws.bucket;
     let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
-    let params = { Bucket: myBucket, Key: myKey, Body: img };
+    let params = {Bucket: myBucket, Key: myKey, Body: img};
 
     return this.s3.putObject(params, function (err, data) {
         if (err) {
@@ -264,13 +264,13 @@ Resizer.prototype.uploadToAws = function (img, itemDetails) {
 Resizer.prototype.updateWebflow = function (itemDetails) {
     let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
     let field = `${itemDetails.fieldName}`;
-    
+
     let fieldsObject = {
         collectionId: itemDetails.collectionId,
         itemId: itemDetails.itemId,
         fields: {}
     }
-    
+
     fieldsObject.fields[field] = url;
 
     itemDetails.requiredFields.forEach(field => {

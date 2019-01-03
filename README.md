@@ -40,7 +40,7 @@ var resizer = new WebflowImageResizer(
         webflow: {
             token: 'example-webflow-token'
         },
-        quality: 90  //quality of image asa percentage
+        quality: 90  //quality of image as a percentage
     }
 );
 
