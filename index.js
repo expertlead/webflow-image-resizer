@@ -35,7 +35,7 @@ Resizer.prototype.onResizeSite = function (siteId) {
         )
     }).then(
         collections => {
-            collectionsWithImagesFields = []
+            collectionsWithImagesFields = [];
             collections.forEach(c => {
                 console.log(`checking for image fields in ${c._id}`)
                 var imagesFields = this.getImagesFieldsFromCollection(c);
@@ -226,8 +226,8 @@ Resizer.prototype.changeSize = function (itemDetails) {
         .then(image => {
             return image
                 .scaleToFit(itemDetails.width, itemDetails.height) // resize
-                .quality(this.config.quality) // set JPEG quality     
-                .getBufferAsync(Jimp.MIME_JPEG)
+                .quality(this.config.quality) // set PNG quality
+                .getBufferAsync(Jimp.MIME_PNG)
         })
         .then(img => {
             return this.uploadToAws(img, itemDetails);
@@ -243,7 +243,7 @@ Resizer.prototype.changeSize = function (itemDetails) {
 
 Resizer.prototype.uploadToAws = function (img, itemDetails) {
     let myBucket = this.config.aws.bucket;
-    let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
+    let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.png`;
     let params = {Bucket: myBucket, Key: myKey, Body: img};
 
     return this.s3.putObject(params, function (err, data) {
@@ -262,7 +262,7 @@ Resizer.prototype.uploadToAws = function (img, itemDetails) {
 }
 
 Resizer.prototype.updateWebflow = function (itemDetails) {
-    let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.jpg`;
+    let url = `https://s3.${this.config.aws.region}.amazonaws.com/${this.config.aws.bucket}/${itemDetails.itemId}-${itemDetails.fieldId}.png`;
     let field = `${itemDetails.fieldName}`;
 
     let fieldsObject = {
