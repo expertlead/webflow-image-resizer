@@ -224,8 +224,9 @@ Resizer.prototype.validateImageSize = function (itemDetails) {
 Resizer.prototype.changeSize = function (itemDetails) {
     return Jimp.read(itemDetails.imageUrl)
         .then(image => {
+            const acceptedMimes = ['jpg', 'png', 'bmp'];
             const mime =
-                image.getMIME().split("/")[1] === "jpg" || "png" || "bmp"
+                acceptedMimes.includes(image.getMIME().split("/")[1])
                     ?
                     image.getMIME().split("/")[1]
                     :
@@ -252,7 +253,6 @@ Resizer.prototype.uploadToAws = function (img, itemDetails) {
     let myBucket = this.config.aws.bucket;
     let myKey = `${itemDetails.itemId}-${itemDetails.fieldId}.${itemDetails.mime}`;
     let params = {Bucket: myBucket, Key: myKey, Body: img};
-    console.log(params)
 
     return this.s3.putObject(params, function (err, data) {
         if (err) {
